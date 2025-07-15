@@ -1,0 +1,10 @@
+fastapi
+requests
+openai
+pydantic
+uvicorn
+tenacity
+aiohttp
+pydantic-settings
+google-genai
+pandas
