@@ -11,6 +11,7 @@ from app.config import keys
 from datetime import datetime
 import json
 from pathlib import Path 
+from functions.interview_questions import process_audio_response_2
 
 
 router = APIRouter(prefix='/data_gathering')
@@ -63,19 +64,21 @@ async def candidate_details(
 async def get_questions():
 
     questions = [
-        "Can you explain the key differences between NumPy arrays and standard Python lists?",
-        "What is the primary purpose of Pandas DataFrames, and how do they aid data manipulation?",
-        "Describe a typical workflow when using Scikit-Learn for a classification task.",
-        "When would you choose Matplotlib or Seaborn for data visualization, and why?",
-        "What are the main advantages of using TensorFlow or PyTorch for deep learning projects?",
-        "How have you used OpenCV in any of your computer vision projects?",
-        "Can you explain the role of Keras within the TensorFlow ecosystem?",
-        "Why might you choose FastAPI for deploying a machine learning model?",
-        "Describe a scenario where Streamlit would be a good choice for building a data application or dashboard.",
-        "How do you approach handling missing data or outliers in a dataset?",
-        "What is overfitting in machine learning, and how do you mitigate it?",
-        "How would you ensure the performance and scalability of a deployed ML model?",
-        "Can you discuss a challenging problem you faced in a machine learning project and how you resolved it?"
+      "Can you explain the core differences between supervised and unsupervised learning?",
+      "How do you typically use Python's Pandas library for data manipulation and cleaning?",
+      "What are the primary differences between TensorFlow and PyTorch, and when would you choose one over the other?",
+      "Describe a scenario where you would use Scikit-Learn versus a deep learning framework like Keras.",
+      "How do you leverage OpenCV for computer vision tasks?",
+      "Explain the process of building a simple web application for a machine learning model using FastAPI or Streamlit.",
+      "What is the purpose of SQL in an AI/ML project workflow?",
+      "How do you approach handling missing data in a dataset?",
+      "Can you describe a project where you applied deep learning concepts using TensorFlow or PyTorch?",
+      "How do you interpret and visualize model performance metrics using libraries like Matplotlib or Seaborn?",
+      "What techniques do you use to prevent overfitting in machine learning models?",
+      "Describe your experience with model deployment and monitoring in a production environment.",
+      "How do you optimize a machine learning model for performance and efficiency?",
+      "Can you explain the concept of transfer learning and when it is beneficial?",
+      "Discuss a challenging AI/ML problem you've encountered and how you resolved it."
     ]
 
     # return any random question from the list
@@ -106,6 +109,9 @@ interview_data = []  # Each entry: { "question": str, "transcript": str, "audio_
 @router.post("/upload-response")
 async def upload_response(question: str = Form(...), audio: UploadFile = File(...)):
     try:
+        file_bytes = await audio.read()
+        if not file_bytes:
+            raise ValueError("Uploaded audio file is empty.")
         # Save audio file locally
         audio_dir = Path(keys.directory).joinpath("responses_audio")  # .wav lossless format
         os.makedirs(audio_dir, exist_ok=True)
@@ -116,10 +122,10 @@ async def upload_response(question: str = Form(...), audio: UploadFile = File(..
         file_name = f"question_{sanitized_question}_{timestamp}.wav"
 
         with open(audio_dir.joinpath(file_name), "wb") as buffer:
-            shutil.copyfileobj(audio.file, buffer)
+            buffer.write(file_bytes)
 
         # Placeholder for actual transcription logic
-        transcript_text = f'Hi this is a dummy transcription of the audio file, for {audio_dir}'
+        transcript_text = await process_audio_response_2(file_bytes)
 
         # Save question + transcription for later evaluation
         interview_data.append({
