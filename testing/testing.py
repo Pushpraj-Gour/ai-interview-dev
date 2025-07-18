@@ -1,9 +1,14 @@
-import requests
-import json
-from config import key
 
 import requests
 import json
+import requests
+import json
+import asyncio
+# from app.config import keys
+
+import requests
+import json
+from functions.interview_questions import process_audio_response
 
 # response = requests.post(
 #   url="https://openrouter.ai/api/v1/chat/completions",
@@ -42,30 +47,40 @@ import json
 #     print(f"Error: {response.status_code} - {response.text}")
 
 
-import requests
-import json
-
-response = requests.post(
-  url="https://openrouter.ai/api/v1/chat/completions",
-  headers={
-    "Authorization": f"Bearer {key.open_router_key}",
-    "Content-Type": "application/json",
-  },
-  data=json.dumps({
-    "model": "qwen/qwq-32b:free",
-    "messages": [
-      {
-        "role": "user",
-        "content": "What is the meaning of life?"
-      }
-    ],
+# response = requests.post(
+#   url="https://openrouter.ai/api/v1/chat/completions",
+#   headers={
+#     "Authorization": f"Bearer {keys.open_router_key}",
+#     "Content-Type": "application/json",
+#   },
+#   data=json.dumps({
+#     "model": "qwen/qwq-32b:free",
+#     "messages": [
+#       {
+#         "role": "user",
+#         "content": "What is the meaning of life?"
+#       }
+#     ],
     
-  })
-)
-# Check if the request was successful
-if response.status_code == 200:
-    # Parse the JSON response
-    result = response.json()
-    print(json.dumps(result, indent=4))  # Pretty print the JSON result
-else:
-    print(f"Error: {response.status_code} - {response.text}")
+#   })
+# )
+# # Check if the request was successful
+# if response.status_code == 200:
+#     # Parse the JSON response
+#     result = response.json()
+#     print(json.dumps(result, indent=4))  # Pretty print the JSON result
+# else:
+#     print(f"Error: {response.status_code} - {response.text}")
+
+async def test():
+    print('------')
+    print("Testing function")
+    print('------')
+
+async def h1(filename:str):
+  await process_audio_response(filename)
+
+if __name__ == "__main__":
+    # asyncio.run(test())
+  audio_file = r"C:\Users\rajr1\Desktop\projects\files\llm_interviewer\responses_audio\question_When_would_you_choose_Matplotlib_2025-07-17_09-28-06.wav"  # Replace with your audio file path
+  asyncio.run(h1(audio_file))

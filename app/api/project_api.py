@@ -1,12 +1,30 @@
-from fastapi import APIRouter, Body, HTTPException, Depends, Header, Query, Path, Form, File
+from fastapi import APIRouter, Body, HTTPException, Depends, Header, Query, Form, File, UploadFile
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Annotated
 from functions.interview_questions import initial_questions
 from fastapi.responses import JSONResponse
 from app.utils.auth_util import basic_auth
 import random
+import shutil
+import os
+from app.config import keys
+from datetime import datetime
+import json
+from pathlib import Path 
+
 
 router = APIRouter(prefix='/data_gathering')
+
+async def write_to_json(data, file_name):
+	current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+	filepath = Path(keys.directory).joinpath(current_time)
+	os.makedirs(filepath, exist_ok=True)
+	
+	filepath_with_name = Path(filepath).joinpath(file_name)
+	
+	with open(filepath_with_name, 'w', encoding='utf-8') as f:
+		json.dump(data, f, indent=4, default=str)
+		print(f"Wrote {file_name} at {filepath_with_name}")
 
 class CandidateDetails(BaseModel):
     candidate_name: Annotated[str, Field(..., description="Candidate Name", examples=["Pushpraj Gour"]) ]
@@ -80,3 +98,43 @@ async def transcribe_response(response: str = Body(..., description="User's resp
         },
         status_code=200
     )
+
+# Store Q&A for later evaluation
+interview_data = []  # Each entry: { "question": str, "transcript": str, "audio_file": str }
+
+
+@router.post("/upload-response")
+async def upload_response(question: str = Form(...), audio: UploadFile = File(...)):
+    try:
+        # Save audio file locally
+        audio_dir = Path(keys.directory).joinpath("responses_audio")  # .wav lossless format
+        os.makedirs(audio_dir, exist_ok=True)
+
+        # Generate a clear and concise file name
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        sanitized_question = "_".join(question.split()[:5])  # Use first 5 words of the question
+        file_name = f"question_{sanitized_question}_{timestamp}.wav"
+
+        with open(audio_dir.joinpath(file_name), "wb") as buffer:
+            shutil.copyfileobj(audio.file, buffer)
+
+        # Placeholder for actual transcription logic
+        transcript_text = f'Hi this is a dummy transcription of the audio file, for {audio_dir}'
+
+        # Save question + transcription for later evaluation
+        interview_data.append({
+            "question": question,
+            "transcript": transcript_text,
+            "audio_file": str(audio_dir.joinpath(file_name))
+        })
+
+        await write_to_json(interview_data, "interview_data.json")
+
+        return {
+            "status": "success",
+            "message": "Audio uploaded and transcribed successfully.",
+            "transcript": transcript_text
+        }
+
+    except Exception as e:
+        return {"status": "error", "message": str(e)}

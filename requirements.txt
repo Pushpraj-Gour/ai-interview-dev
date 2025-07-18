@@ -7,4 +7,6 @@ tenacity
 aiohttp
 pydantic-settings
 google-genai
-pandas
+elevenlabs
+python-dotenv
+python-multipart

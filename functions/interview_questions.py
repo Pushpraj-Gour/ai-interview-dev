@@ -7,6 +7,10 @@ from functions import prompts
 from pathlib import Path
 from datetime import datetime
 import os
+from dotenv import load_dotenv
+from io import BytesIO
+import requests
+from elevenlabs.client import ElevenLabs
 
 
 async def write_to_json(data, file_name):
@@ -35,3 +39,44 @@ async def initial_questions(candidate_info: dict):
 	await write_to_json(output, "first_draft.json")
 	
 	return output
+
+# This function is to process the audio response which we are getting from the frontend, the idea is to convert audio to text.
+async def process_audio_response(audio_file: str):
+
+	load_dotenv()
+
+	elevenlabs = ElevenLabs(
+	api_key=keys.elevenlabs_api_key,
+	)
+
+	with open(audio_file, 'rb') as audio:
+		audio_data = BytesIO(audio.read())
+
+	response = elevenlabs.speech_to_text.convert(
+		file=audio_data,
+		model_id="scribe_v1", # Model to use, for now only "scribe_v1" is supported
+		tag_audio_events=True, # Tag audio events like laughter, applause, etc.
+		language_code="eng", # Language of the audio file. If set to None, the model will detect the language automatically.
+		diarize=True, # Whether to annotate who is speaking
+	)
+
+	transcription = {
+		"transcription": response.text,
+		"audio_file": audio_file,
+		"transcription_response": response,
+		"timestamp": datetime.now().isoformat(),
+	}
+
+	await write_to_json(transcription, "transcription.json")
+
+	return response.text
+
+async def main(filename: str):
+
+	result = await process_audio_response(filename)
+
+	print(result)
+
+if __name__ == "__main__":
+	audio_file = r"C:\Users\rajr1\Desktop\projects\files\llm_interviewer\responses_audio\question_When_would_you_choose_Matplotlib_2025-07-17_09-28-06.wav"  # Replace with your audio file path
+	asyncio.run(main(audio_file))

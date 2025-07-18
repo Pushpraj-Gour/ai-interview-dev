@@ -20,12 +20,15 @@
             "cwd": "${workspaceFolder}"
         },
 		{
-			"name": "Python Debugger: Current File in test",
+			"name": "Test current file",
 			"type": "debugpy",
 			"request": "launch",
 			"program": "${file}",
 			"console": "integratedTerminal",
-			"cwd": "${workspaceFolder}/testing"
+			"cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
 		}
     ]
 }

@@ -12,6 +12,9 @@ class Keys(BaseSettings):
 	basic_auth_username: str
 	basic_auth_password: str
 
+	elevenlabs_api_key: str
+
+
 
 	class Config:
 		env_file = ".env"
