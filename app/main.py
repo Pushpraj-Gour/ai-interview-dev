@@ -10,7 +10,8 @@ from fastapi.responses import JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import project_api
-
+from contextlib import asynccontextmanager
+from app.db.database import engine, Base
 
 import logging
 logging.basicConfig(format='%(asctime)s: %(levelname)s: [%(funcName)s]: %(message)s', level=logging.INFO, force=True)
@@ -27,11 +28,20 @@ else:
     routers = [project_api.router]
     app_name = 'Juice Creativity - All APIs'
 
-app = FastAPI(title=app_name)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield
+    # Shutdown (optional)
+    # cleanup code here if needed
+
+app = FastAPI(title=app_name, lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # You can use ["*"] for development
+    allow_origins=["*"],  # You can lock this down later
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -85,4 +95,4 @@ async def sleep(seconds: int, caller: str):
 	await asyncio.sleep(seconds)
 
 if __name__ == "__main__":
-   uvicorn.run(app, host="0.0.0.0", port=8080)
+   uvicorn.run(app, host="0.0.0.0", port=8081)

@@ -10,3 +10,5 @@ google-genai
 elevenlabs
 python-dotenv
 python-multipart
+asyncpg
+sqlalchemy[asyncio]

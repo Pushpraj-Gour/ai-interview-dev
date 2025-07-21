@@ -12,9 +12,17 @@ from datetime import datetime
 import json
 from pathlib import Path 
 from functions.interview_questions import process_audio_response_2
-
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.db.database import get_db
+from app.db.models import Candidate, Interview
+from sqlalchemy.future import select
 
 router = APIRouter(prefix='/data_gathering')
+
+MAJOR_QUESTIONS = []
+QUESTION_ASKED = []
+RECENT_QUESTION = {}
+QUESTION_ANSWERED = {}
 
 async def write_to_json(data, file_name):
 	current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -29,6 +37,7 @@ async def write_to_json(data, file_name):
 
 class CandidateDetails(BaseModel):
     candidate_name: Annotated[str, Field(..., description="Candidate Name", examples=["Pushpraj Gour"]) ]
+    candidate_email: Annotated[str, Field(..., description="Candidate Email", examples=["abc@gmail.com"]) ]
     role: Annotated[str, Field(..., description="Job Role", examples=["AI/ML Engineer"]) ]
     skills: Annotated[str, Field(..., description="Skills of the candidate", examples=["Python, C, SQL, TensorFlow, OpenCV, PyTorch, FastAPI, Keras, Scikit-Learn, streamlit, Seaborn, NumPy, Pandas, Matplotlib"])]
     projects: Annotated[Optional[str], Field(None, description="Projects undertaken by the candidate", examples=["Project A description, Project B description"])]
@@ -37,28 +46,70 @@ class CandidateDetails(BaseModel):
     experience: Annotated[Optional[str], Field(None, description="Work experience of the candidate", examples=["2 years at ABC Corp as a Data Scientist, 1 year at DEF Ltd as a Machine Learning Engineer"])]
     # resume: Optional[str] Gona to take entire resume pdf file, and then extract the details from it.
 
-@router.post("/candidate_details" ,dependencies=[Depends(basic_auth)])
+
+# @router.post("/candidate_details" ,dependencies=[Depends(basic_auth)])
+# async def candidate_details(
+#     candidate_details: CandidateDetails
+# ):
+#     candidate_info = candidate_details.model_dump()
+
+#     try:
+#         response = await initial_questions(candidate_info)
+#         if response is None:
+#             raise HTTPException(status_code=500, detail="Failed to generate initial questions.")
+#         MAJOR_QUESTIONS.extend(response.get("questions", []))      
+#         return JSONResponse(
+#             content={
+#                 "status": "success",
+#                 "message": "Interview questions generated successfully.",
+#                 "data": response
+#             },
+#             status_code=200
+#         )
+    
+#     except Exception as e:
+#         raise HTTPException(
+#             status_code=500,
+#             detail=f"An error occurred while generating interview questions: {str(e)}"
+#         )
+
+@router.post("/candidate_details")
 async def candidate_details(
-    candidate_details: CandidateDetails
+    candidate_details: CandidateDetails,
+    db: AsyncSession = Depends(get_db)
 ):
     candidate_info = candidate_details.model_dump()
 
-    try:
-        response = await initial_questions(candidate_info)
-        return JSONResponse(
-            content={
-                "status": "success",
-                "message": "Interview questions generated successfully.",
-                "data": response
-            },
-            status_code=200
-        )
-    
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"An error occurred while generating interview questions: {str(e)}"
-        )
+    new_candidate = Candidate(
+        name=candidate_info['candidate_name'],
+        email=candidate_info['candidate_email'],
+        role=candidate_info['role'],
+        skills=candidate_info['skills'],
+        projects=candidate_info.get('projects'),
+        education=candidate_info['education'],
+        achievements=candidate_info.get('achievements'),
+        experience=candidate_info.get('experience')
+    )
+
+    db.add(new_candidate)
+    await db.commit()
+    await db.refresh(new_candidate)
+
+    # Continue with question generation logic
+    response = await initial_questions(candidate_info)
+    if response is None:
+        raise HTTPException(status_code=500, detail="Failed to generate initial questions.")
+
+    MAJOR_QUESTIONS.extend(response.get("questions", []))
+
+    return JSONResponse(
+        content={
+            "status": "success",
+            "message": "Interview questions generated successfully.",
+            "data": response
+        },
+        status_code=200
+    )
     
 @router.get("/get_questions", )
 async def get_questions():
@@ -84,6 +135,36 @@ async def get_questions():
     # return any random question from the list
     random.shuffle(questions)
     return { "question": questions[0] }
+
+# @router.get("/get_questions", )
+# async def get_questions_2():
+
+#     """
+#     set of major questions to fetch from the first llm call 
+
+#     We will have two list one for questions asked and one for questions to be asked, so that we can keep track of the questions asked and not asked.
+
+#     Now we will check the response of the current question and then based on that we will decide that the next question is relative to the current question or not, then accordinly we will ask that question or else we will ask from the list of questions to be asked.
+    
+#     """
+
+#     if QUESTION_ASKED is None:
+#         # call the llm to get the first question and return any random question from the list.
+#         if not MAJOR_QUESTIONS:
+#             raise HTTPException(status_code=404, detail="No questions available to ask.")
+#         else:
+#             question = random.choice(MAJOR_QUESTIONS)
+#             QUESTION_ASKED.remove(question)  # Remove the question from the list of major questions
+#             return { "question": question }
+
+#         # Gona take any random question from the list append to questions_asked and return it
+#     else:
+#         # Check the last question response and then decide the next question to ask. Either generate the next question based on the last question or ask from the list of questions to be asked.
+#         # In the prompt I will give the last question and the response of the user, all the question asked and all the major questions and then ask the llm to generate the next question based on that.
+        
+
+
+#     return { "question": "Hello" }
 
 @router.post('/transcribe-response')
 async def transcribe_response(response: str = Body(..., description="User's response to the interview question")):
@@ -144,3 +225,51 @@ async def upload_response(question: str = Form(...), audio: UploadFile = File(..
 
     except Exception as e:
         return {"status": "error", "message": str(e)}
+    
+@router.get("/candidate_details/{email}")
+async def get_candidate(email: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Candidate).where(Candidate.email == email))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return {
+        "id": user.id,
+        "name": user.name,
+        "email": user.email,
+        "role": user.role,
+        "skills": user.skills,
+        "projects": user.projects,
+        "education": user.education,
+        "achievements": user.achievements,
+        "experience": user.experience
+    }
+
+@router.get("/interviews/{email}")
+async def get_interviews(email: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(Interview).join(Candidate).where(Candidate.email == email)
+    )
+    interviews = result.scalars().all()
+    return [
+        {
+            "id": iv.id,
+            "date": iv.date,
+            "score": iv.score,
+            "summary": iv.summary
+        } for iv in interviews
+    ]
+
+@router.put("/candidate_details/{email}")
+async def update_candidate(email: str, updated_data: CandidateDetails, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Candidate).where(Candidate.email == email))
+    candidate = result.scalar_one_or_none()
+
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+
+    for field, value in updated_data.dict(exclude_unset=True).items():
+        setattr(candidate, field, value)
+
+    await db.commit()
+    return {"status": "updated"}

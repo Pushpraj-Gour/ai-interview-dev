@@ -20,7 +20,7 @@
             "cwd": "${workspaceFolder}"
         },
 		{
-			"name": "Test current file",
+			"name": "Run Current file",
 			"type": "debugpy",
 			"request": "launch",
 			"program": "${file}",

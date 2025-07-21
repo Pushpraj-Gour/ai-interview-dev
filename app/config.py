@@ -14,6 +14,8 @@ class Keys(BaseSettings):
 
 	elevenlabs_api_key: str
 
+	neon_db_connection_DATABASE_URL: str = 'postgresql+asyncpg://neondb_owner:npg_LV3SO6rbcGPt@ep-flat-forest-a1g1yy9v-pooler.ap-southeast-1.aws.neon.tech/neondb?ssl=require'
+
 
 
 	class Config:
