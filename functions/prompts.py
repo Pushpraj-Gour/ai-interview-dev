@@ -80,38 +80,42 @@ Instructions for Generating Next Question:
 """}
 
 
+
+
 generate_question_based_on_response_2 = {
     "user_message": """
 You are assisting in a live job interview. You have the following information:
 
 1. Candidate Name:
 <candidate_name>
-{{candidate_name}}
+{candidate_name}
 </candidate_name>
 
 2. Job Role:
 <job_role>
-{{job_role}}
+{role}
 </job_role>
 
 3. Candidate Skills:
 <skills_list>
-{{skills_list}}
+{skills}
 </skills_list>
 
 4. List of Major Questions:
 <major_questions_list>
-{{major_questions_list}}
+{major_questions}
 </major_questions_list>
 
 5. Questions Already Asked:
 <asked_questions_list>
-{{asked_questions_list}}
+{questions_asked}
 </asked_questions_list>
 
 6. Most Recent Question Asked along with the Candidate's Response:
 <last_question_along_with_response>
-{{last_question_along_with_response}}
+
+Question: {last_question}
+Candidate's Response: {response}
 <>last_question_along_with_response>
 
 Based on all the above:
@@ -121,5 +125,66 @@ a. Analyze the most recent response to see if a follow-up or deeper question can
 b. If a meaningful follow-up is possible, generate a contextual follow-up question.
 
 c. If not, select a relevant question from the list of unasked major questions that aligns well with the candidate's profile and keeps the interview engaging.
+
+"""}
+
+generate_question_based_on_response_3 = {
+    "user_message": """
+You are acting as a realistic interviewer in a mock interview setting. 
+Your goal is to:
+- Cover as many of the candidate's listed skills as possible.
+- Make the interview feel natural and conversational.
+- Occasionally ask follow-up questions for depth when it makes sense.
+
+### Candidate Name:
+<candidate_name>
+{candidate_name}
+</candidate_name>
+
+### Job Role:
+<job_role>
+{role}
+</job_role>
+
+### Candidate Skills:
+<skills_list>
+{skills}
+</skills_list>
+
+### List of Major Questions:
+<major_questions_list>
+{major_questions}
+</major_questions_list>
+
+### Questions Already Asked:
+<asked_questions_list>
+{questions_asked}
+</asked_questions_list>
+
+### Most Recent Question Asked along with the Candidate's Response:
+<last_question_along_with_response>
+
+Question: {last_question}
+Candidate's Response: {response}
+<>last_question_along_with_response>
+
+---
+
+### Instructions:
+1. Decide if a follow-up question is needed:
+   - Ask a follow-up ONLY IF:
+     - The answer is brief or lacks depth (less than 50 words or surface-level).
+     - The answer mentions a key skill from the profile worth exploring further.
+     - The answer includes something unique or interesting (special project, uncommon tool).
+     - The answer hints at decision-making, leadership, or problem-solving worth elaborating on.
+   - Do NOT ask follow-up if:
+     - The response is already detailed and covers reasoning, challenges, and outcomes.
+     - The topic is low priority compared to other skills to cover.
+
+2. If a follow-up is needed:
+   - Generate ONE relevant, natural follow-up question.
+   - Make it specific to what the candidate mentioned.
+   - Keep it conversational, like a real interviewer would ask.
+
 
 """}

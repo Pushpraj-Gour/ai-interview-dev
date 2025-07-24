@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Body, HTTPException, Depends, Header, Query, Form, File, UploadFile
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Annotated
-from functions.interview_questions import initial_questions
+from functions.interview_questions import initial_questions, next_question, processed_result
 from fastapi.responses import JSONResponse
 from app.utils.auth_util import basic_auth
 import random
@@ -11,7 +11,7 @@ from app.config import keys
 from datetime import datetime
 import json
 from pathlib import Path 
-from functions.interview_questions import process_audio_response_2
+from functions.interview_questions import process_audio_response_2, process_audio_response_3
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.database import get_db
 from app.db.models import Candidate, Interview
@@ -19,10 +19,7 @@ from sqlalchemy.future import select
 
 router = APIRouter(prefix='/data_gathering')
 
-MAJOR_QUESTIONS = []
-QUESTION_ASKED = []
-RECENT_QUESTION = {}
-QUESTION_ANSWERED = {}
+CANDIDATE_INFO = {}
 
 async def write_to_json(data, file_name):
 	current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -73,8 +70,8 @@ class CandidateDetails(BaseModel):
 #             detail=f"An error occurred while generating interview questions: {str(e)}"
 #         )
 
-@router.post("/candidate_details")
-async def candidate_details(
+@router.post("/register_candidate")
+async def register_candidate(
     candidate_details: CandidateDetails,
     db: AsyncSession = Depends(get_db)
 ):
@@ -100,8 +97,6 @@ async def candidate_details(
     if response is None:
         raise HTTPException(status_code=500, detail="Failed to generate initial questions.")
 
-    MAJOR_QUESTIONS.extend(response.get("questions", []))
-
     return JSONResponse(
         content={
             "status": "success",
@@ -111,30 +106,30 @@ async def candidate_details(
         status_code=200
     )
     
-@router.get("/get_questions", )
-async def get_questions():
+# @router.get("/get_questions", )
+# async def get_questions():
 
-    questions = [
-      "Can you explain the core differences between supervised and unsupervised learning?",
-      "How do you typically use Python's Pandas library for data manipulation and cleaning?",
-      "What are the primary differences between TensorFlow and PyTorch, and when would you choose one over the other?",
-      "Describe a scenario where you would use Scikit-Learn versus a deep learning framework like Keras.",
-      "How do you leverage OpenCV for computer vision tasks?",
-      "Explain the process of building a simple web application for a machine learning model using FastAPI or Streamlit.",
-      "What is the purpose of SQL in an AI/ML project workflow?",
-      "How do you approach handling missing data in a dataset?",
-      "Can you describe a project where you applied deep learning concepts using TensorFlow or PyTorch?",
-      "How do you interpret and visualize model performance metrics using libraries like Matplotlib or Seaborn?",
-      "What techniques do you use to prevent overfitting in machine learning models?",
-      "Describe your experience with model deployment and monitoring in a production environment.",
-      "How do you optimize a machine learning model for performance and efficiency?",
-      "Can you explain the concept of transfer learning and when it is beneficial?",
-      "Discuss a challenging AI/ML problem you've encountered and how you resolved it."
-    ]
+#     questions = [
+#       "Can you explain the core differences between supervised and unsupervised learning?",
+#       "How do you typically use Python's Pandas library for data manipulation and cleaning?",
+#       "What are the primary differences between TensorFlow and PyTorch, and when would you choose one over the other?",
+#       "Describe a scenario where you would use Scikit-Learn versus a deep learning framework like Keras.",
+#       "How do you leverage OpenCV for computer vision tasks?",
+#       "Explain the process of building a simple web application for a machine learning model using FastAPI or Streamlit.",
+#       "What is the purpose of SQL in an AI/ML project workflow?",
+#       "How do you approach handling missing data in a dataset?",
+#       "Can you describe a project where you applied deep learning concepts using TensorFlow or PyTorch?",
+#       "How do you interpret and visualize model performance metrics using libraries like Matplotlib or Seaborn?",
+#       "What techniques do you use to prevent overfitting in machine learning models?",
+#       "Describe your experience with model deployment and monitoring in a production environment.",
+#       "How do you optimize a machine learning model for performance and efficiency?",
+#       "Can you explain the concept of transfer learning and when it is beneficial?",
+#       "Discuss a challenging AI/ML problem you've encountered and how you resolved it."
+#     ]
 
-    # return any random question from the list
-    random.shuffle(questions)
-    return { "question": questions[0] }
+#     # return any random question from the list
+#     random.shuffle(questions)
+#     return { "question": questions[0] }
 
 # @router.get("/get_questions", )
 # async def get_questions_2():
@@ -166,24 +161,24 @@ async def get_questions():
 
 #     return { "question": "Hello" }
 
-@router.post('/transcribe-response')
-async def transcribe_response(response: str = Body(..., description="User's response to the interview question")):
-    """
-    Endpoint to submit the user's response to an interview question.
-    This is a placeholder for future implementation of response handling.
-    """
-    # Here you would typically process the response, e.g., store it or analyze it.
-    print(response)
-    return JSONResponse(
-        content={
-            "status": "success",
-            "message": "Response submitted successfully.",
-            "data": {"response": response}
-        },
-        status_code=200
-    )
+# @router.post('/transcribe-response')
+# async def transcribe_response(response: str = Body(..., description="User's response to the interview question")):
+#     """
+#     Endpoint to submit the user's response to an interview question.
+#     This is a placeholder for future implementation of response handling.
+#     """
+#     # Here you would typically process the response, e.g., store it or analyze it.
+#     print(response)
+#     return JSONResponse(
+#         content={
+#             "status": "success",
+#             "message": "Response submitted successfully.",
+#             "data": {"response": response}
+#         },
+#         status_code=200
+#     )
 
-# Store Q&A for later evaluation
+# # Store Q&A for later evaluation
 interview_data = []  # Each entry: { "question": str, "transcript": str, "audio_file": str }
 
 
@@ -206,16 +201,16 @@ async def upload_response(question: str = Form(...), audio: UploadFile = File(..
             buffer.write(file_bytes)
 
         # Placeholder for actual transcription logic
-        transcript_text = await process_audio_response_2(file_bytes)
+        transcript_text = await process_audio_response_2(question, file_bytes)
 
         # Save question + transcription for later evaluation
-        interview_data.append({
-            "question": question,
-            "transcript": transcript_text,
-            "audio_file": str(audio_dir.joinpath(file_name))
-        })
+        # interview_data.append({
+        #     "question": question,
+        #     "transcript": transcript_text,
+        #     "audio_file": str(audio_dir.joinpath(file_name))
+        # })
 
-        await write_to_json(interview_data, "interview_data.json")
+        # await write_to_json(interview_data, "interview_data.json")
 
         return {
             "status": "success",
@@ -245,6 +240,7 @@ async def get_candidate(email: str, db: AsyncSession = Depends(get_db)):
         "experience": user.experience
     }
 
+# TODO: Implement get all interviews endpoint
 @router.get("/interviews/{email}")
 async def get_interviews(email: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
@@ -260,6 +256,7 @@ async def get_interviews(email: str, db: AsyncSession = Depends(get_db)):
         } for iv in interviews
     ]
 
+# TODO: Implement update candidate details endpoint
 @router.put("/candidate_details/{email}")
 async def update_candidate(email: str, updated_data: CandidateDetails, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Candidate).where(Candidate.email == email))
@@ -273,3 +270,82 @@ async def update_candidate(email: str, updated_data: CandidateDetails, db: Async
 
     await db.commit()
     return {"status": "updated"}
+
+@router.get("/feedback")
+async def get_feedback():
+
+    feedback = await processed_result()
+
+    return JSONResponse(
+        content={
+            "status": "success",
+            "message": "Feedback fetched successfully.",
+            "data": {"feedback": "Thanyou for the interview!"}
+        },
+        status_code=200
+    )
+
+@router.get("/initial_questions/{email}")
+async def get_initial_questions(email: str, db: AsyncSession = Depends(get_db)):
+    # Fetch all the candidate details based on the email which we are putting in the database 
+    
+    result = await db.execute(select(Candidate).where(Candidate.email == email))
+    candidate = result.scalar_one_or_none()
+    
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+
+    candidate_info = {column.name: getattr(candidate, column.name) for column in candidate.__table__.columns}
+
+    CANDIDATE_INFO.update(candidate_info)
+
+    # with open("candidate_info_from_db.json", "w") as f:
+    #     json.dump(candidate_info, f, indent=4)
+
+    try:
+        initial_question = await initial_questions(candidate_info)
+        if initial_question is None:
+            raise HTTPException(status_code=500, detail="Failed to generate initial questions.")
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"An error occurred while generating initial questions: {str(e)}"
+        )
+
+    return {"question": initial_question}
+
+@router.get("/next_question")
+async def get_next_questions():
+    """
+    This endpoint is to get the next question based on the last question response and the questions asked so far.
+    """
+
+    question = await next_question()
+
+    return {"question": question}
+
+
+@router.post("/upload-response-testing")
+async def upload_response_testing(question: str, response: str):
+    try:
+        # Placeholder for actual transcription logic
+        transcript_text = await process_audio_response_3(question, response)
+
+        # Save question + transcription for later evaluation
+        # interview_data.append({
+        #     "question": question,
+        #     "transcript": transcript_text,
+        #     "audio_file": str(audio_dir.joinpath(file_name))
+        # })
+
+        # await write_to_json(interview_data, "interview_data.json")
+
+        return {
+            "status": "success",
+            "message": "Audio uploaded and transcribed successfully.",
+            "transcript": transcript_text
+        }
+
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
