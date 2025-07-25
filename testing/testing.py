@@ -8,7 +8,7 @@ import asyncio
 
 import requests
 import json
-from functions.interview_questions import process_audio_response
+from functions.interview_questions import *
 
 # response = requests.post(
 #   url="https://openrouter.ai/api/v1/chat/completions",
@@ -77,10 +77,12 @@ async def test():
     print("Testing function")
     print('------')
 
-async def h1(filename:str):
-  await process_audio_response(filename)
+
+
+async def h1():
+  await process_feedback_for_each_response()
 
 if __name__ == "__main__":
     # asyncio.run(test())
   audio_file = r"C:\Users\rajr1\Desktop\projects\files\llm_interviewer\responses_audio\question_When_would_you_choose_Matplotlib_2025-07-17_09-28-06.wav"  # Replace with your audio file path
-  asyncio.run(h1(audio_file))
+  asyncio.run(h1())

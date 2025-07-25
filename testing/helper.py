@@ -204,3 +204,65 @@ C. Interview Termination
     Feedback and suggestions for improvement, stored and optionally displayed to the user.
 
 """
+
+# Prompt for feedback generation
+
+"""
+Objective:
+Design a reusable prompt that simulates the evaluation process of a live interview response for a specific role or domain provided at runtime. The goal is to mimic a real interview scenario where an interviewer poses a question, the candidate responds, and an expert (AI) evaluates the response critically and professionally.
+
+# Prompt Functionality Requirements
+
+## The prompt should:
+
+### Input:
+  - A specific interview question.
+  - The candidate's actual response.
+  - The role or domain the interview is for (e.g., Software Engineer, Product Manager, Data Analyst).
+
+## Output:
+
+### Comprehensive Analysis of the candidate's response, including:
+
+  - Strengths.
+  - Weaknesses.
+  - Gaps or missing elements.
+  - Overall effectiveness in the context of the role.
+
+## Suggestions for Improvement, clearly outlining:
+
+  - What could be done better.
+  - How the answer can be made more aligned with expectations for the role.
+
+## Evaluation Parameters Used, such as (but not limited to):
+
+  - Relevance and completeness of the answer.
+  - Clarity and communication.
+  - Depth of domain knowledge.
+  - Logical structure and flow.
+  - Use of real-world examples.
+  - Role alignment and professional tone.
+
+## Ideal Model Answer:
+
+  - A well-structured, role-specific ideal response to the given question.
+  - Should serve as a benchmark for comparison.
+"""
+
+"""
+Task:
+Create a prompt that simulates the evaluation of a live interview scenario. The prompt should accept:
+
+1. An interview question.
+2. The candidate's response.
+3. The specific role or domain (e.g., Software Engineering, Product Management, Data Science, etc.).
+
+Based on this input, the language model should:
+
+1. Perform a deep and thoughtful analysis of the candidate's response.
+2. Offer insights into how well the candidate answered the question.
+3. Identify what was strong and what could be improved.
+4. Reflect on the overall effectiveness of the answer.
+5. Provide an ideal or model answer to the same question for comparison.
+The evaluation criteria and analytical approach should be internally decided by the model based on the context and role provided. The tone should mimic that of a real interview assessment.
+"""

@@ -248,7 +248,60 @@ async def next_question():
         LAST_QUESTION_ASKED = question_to_ask
         return question_to_ask
     
-async def processed_result():
+async def process_feedback_for_each_response():
+    # Save all the information we have gathered so far in a json file, all the questions asked, the responses, the candidate information, etc. Along with it we will update the sql database with the candidate information and the questions asked so far.
+
+
+    with open("output.json", "r", encoding='utf-8') as f:
+        details = json.load(f)
+
+    questions_answers = details.get("question_answered")
+    role = details.get("candidate_info").get("role")
+    formatted_questions_and_responses = ""
+    for question, response in questions_answers.items(): # TODO: Update this to use the actual questions and responses
+        formatted_questions_and_responses += f"- Question: {question}\n  Response: {response}\n\n"
+
+    data = {
+        "role": role, #TODO: Update this to use the actual role
+        "questions_and_responses": formatted_questions_and_responses,
+    }
+
+    class DetailedAnalysisResponse(BaseModel):
+        communication_score: int
+        # communication_reasoning: str
+        content_quality_score: int
+        # content_quality_reasoning: str
+        domain_insight_score: int
+        # domain_insight_reasoning: str
+        strategic_depth_score: int
+        # strategic_depth_reasoning: str
+        professional_tone_score: int
+        # professional_tone_reasoning: str
+        ideal_answer: str
+
+    class DedicatedAnalysis(BaseModel):
+        question: str
+        overall_score: int
+        overall_reasoning: str
+        question_and_response_detailed_analysis: List[DetailedAnalysisResponse]
+
+    class Analysis(BaseModel):
+        overall_analysis: str
+        question_analysis: List[DedicatedAnalysis]
+
+
+    user_message = prompts.generate_dedicated_analysis_3["user_message"].format(**data)
+
+    output = await llm_util.llm_genai_2(prompt=user_message, response_schema=Analysis)
+    
+    await write_to_json(output, "response_analysis.json")
+    # Update the SQL database with the candidate information and the questions asked so far
+    # This is a placeholder for the actual database update logic
+    # TODO: Implement the database update logic here
+
+    return output
+    
+async def process_and_give_overall_feedback():
     # Save all the information we have gathered so far in a json file, all the questions asked, the responses, the candidate information, etc. Along with it we will update the sql database with the candidate information and the questions asked so far.
     data = {
         "candidate_info": CANDIDATE_INFO,
