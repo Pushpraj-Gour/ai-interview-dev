@@ -1,9 +1,4 @@
-# Project detailed Idea
-
-# 1. After getting all the required info of the candidate. --> (Through front end, and backend)
-# 2. Prompt_1. It will take all the details of the candidate and generate a list of interview questions. along with some basic Introductory questions which can easy the candidate, not directly jumping to the job related questions, at most 2,3 questions.
-# 3.
-
+from typing import List
 from pydantic import BaseModel
 
 
@@ -81,9 +76,6 @@ Instructions for Generating Next Question:
   c. Generate the next question based on the last question and the candidate's response, if the response is having something from which we can ask the next question to make the interview more interactive, and somewhat it is related to the major_quesitons or candidate's profile create it.
   d. If the candidate's response is not sufficient to generate a new question, select a question from the major questions that have not been asked yet.
 """}
-
-
-
 
 generate_question_based_on_response_2 = {
     "user_message": """
@@ -166,12 +158,9 @@ Your goal is to:
 
 ### Most Recent Question Asked along with the Candidate's Response:
 <last_question_along_with_response>
-
 Question: {last_question}
 Candidate's Response: {response}
-<>last_question_along_with_response>
-
----
+</last_question_along_with_response>
 
 ### Instructions:
 1. Decide if a follow-up question is needed:
@@ -251,51 +240,6 @@ Provide each question's answer suggest what ideally the candidate should have an
 }
 
 
-generate_dedicated_analysis_2 = {
-    "user_message": """
-You are simulating an expert interviewer evaluating a candidate's response during a live job interview. Use the inputs below to generate a critical, professional analysis, suggest improvements, define evaluation parameters, and provide an ideal benchmark answer.
-
-
-### **INPUT**
-- **Role/Domain**: `{{role_or_domain}}`  
-- **Interview question along with the response**: `{{interview_question}}` 
-
----
-
-### **OUTPUT**
-
-#### **Suggestions for Improvement**
-
-- Detail **specific ways** the candidate can improve their response.
-- Provide actionable guidance to better meet expectations for **`{{role_or_domain}}`**.
-- Suggest improvements to structure, tone, examples, or technical content.
-
----
-
-#### **Evaluation Parameters Used**
-
-| Parameter                    | Assessment Focus                                                                  |
-|-----------------------------|------------------------------------------------------------------------------------|
-| **Relevance & Completeness** | Does the response fully address the question? Does it stay on topic?             |
-| **Clarity & Communication** | Is the answer well-articulated and easy to follow?                               |
-| **Depth of Domain Knowledge** | Does it demonstrate clear understanding of the role/domain?                    |
-| **Logical Structure & Flow** | Is the answer well-organized with a coherent flow of ideas?                     |                   |
-| **Role Alignment & Tone**   | Does the answer reflect professionalism and match expectations for the role?     |
-
----
-
-#### **Ideal Model Answer (Benchmark)**
-
-- Provide a **well-structured, detailed answer** that meets or exceeds expectations for the role of **`{{role_or_domain}}`**.
-- Incorporate:
-  - Technical or strategic depth (as appropriate),
-  - Clear articulation,
-  - Role-appropriate terminology,
-  - Real-world examples or quantifiable results,
-  - Professional tone and logical flow.
-
-"""}
-
 class DetailedAnalysisResponse(BaseModel):
     communication_score: int
     communication_reasoning: str
@@ -368,7 +312,7 @@ Provide **actionable, role-specific advice** to improve future answers. Include 
 
 #### Ideal Model Answer (Benchmark)
 
-Craft a **high-quality, well-structured answer** to the same question, tailored to the expectations of the **{{role_or_domain}}**. This model answer should:
+Craft a **high-quality, well-structured answer** to the same question, tailored to the expectations of the **{role}**. This model answer should:
 
 - Fully address the question with depth and clarity
 - Include relevant terminology or frameworks
@@ -380,18 +324,78 @@ Craft a **high-quality, well-structured answer** to the same question, tailored 
 
 generate_overall_analysis = {
     "user_message": """
-You are an AI assistant tasked with analyzing a candidate's interview performance based on their responses to questions.
+You are an AI assistant assigned to provide a comprehensive analysis of a candidate's interview performance based on their responses to multiple questions.
 
-Following are the questions along with the candidate's responses:
+Following are the analysis of the candidate's responses for each question your task is to provide an overall analysis of the candidate's performance based on the individual question analyses. Like how good he is overall in the interview, what are the areas where he is good, and what are the areas where he needs to improve, and what are the suggestions for improvement. 
+
+<question_analysis>
+{question_analysis}
+</question_analysis>
+
+Score it overall in the range of 0-10 and provide the reasoning behind the score for the following aspects:
+- Overall Communication
+- Overall Content Quality
+- Overall Domain Insight
+
+Score it overall in the range of 0-10 based on everthing and provide the reasoning behind the score for the following aspects, generate an overall score in the range of 0-10 and give score to the overall communication, content quality, domain insight, strategic depth, and professional tone. Also provide the reasoning behind the score. 
+
+List all the Technical Skills and Soft Skills that the candidate has based on the questions asked and the responses given by the candidate on the skills that the questions are based on. and rate candidate on the scale of 0-10 for each skill based on the responses given by the candidate on the skills that the questions are based on.  
+
+"""
+}
 
 
-<questons_and_responses_detailed_analysis>
-{questions_and_responses_detaied_analysis}
-</questons_and_responses_detaied_analysis>
 
-Your task is to provide a detailed analysis of the candidate's performance, focusing on the following aspects:
+generate_overall_analysis_2 = {
+    "user_message": """
+You are an AI assistant responsible for generating a **thorough overall analysis** of a candidate's interview performance. The candidate has answered multiple interview questions, and for each question, a detailed evaluation has already been provided.
 
+### **Input**
 
+Given a questions with analysed response containing a list of question-level evaluations, each with detailed scores and reasoning.
+<question_analysis>
+{question_analysis}
+</question_analysis>
+
+You are **not** responsible for evaluating the individual responses—that has already been done. Your role is to **aggregate and analyze the overall performance**.
+
+- An **overall score** and reasoning for that specific question.
+- Understand the evaluation of individual scores and reasoning across:
+  - Communication
+  - Content Quality
+  - Domain Insight
+  - Strategic Depth
+  - Professional Tone
+
+Your task is to synthesize these individual evaluations into a **comprehensive overall performance report**.
+
+### **Your Deliverables**
+
+#### 1. **Overall Summary Analysis**
+
+Write a clear and concise summary of the candidate's interview performance covering:
+
+- **Overall performance quality** (Was it good, average, poor).
+- **Strength areas** - where the candidate performed well across questions (e.g., communication, ML understanding, tooling knowledge, etc.).
+- **Improvement areas** - where the candidate consistently underperformed or showed gaps.
+- **Actionable suggestions** - how the candidate can improve in their weak areas (e.g., studying SQL basics, practicing delivery, deepening domain knowledge).
+
+#### 2. **Overall Scores (0-10)**
+
+Provide overall scores (with reasoning) for the following aspects **across all questions**:
+
+- **Overall Communication**
+- **Overall Content Quality**
+- **Overall Domain Insight**
+
+#### 3. **Skill Evaluation**
+
+From the responses and evaluations, extract all **Technical Skills** and **Soft Skills** the candidate demonstrated.
+
+For each skill:
+- Mention whether it's a **Technical** or **Soft Skill**.
+- Assign a **score (0-10)** based on how well the candidate demonstrated this skill during the interview.
+- Focus only on skills that were tested in the questions (e.g., SQL, Python, ML pipelines, communication, etc.).
 
 """
 }
