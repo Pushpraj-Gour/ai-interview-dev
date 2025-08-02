@@ -1,29 +1,97 @@
-from fastapi import APIRouter, Body, HTTPException, Depends, Header, Query, Form, File, UploadFile
+from fastapi import APIRouter, Body, HTTPException, Depends, Header, Query, Form, File, UploadFile, Request
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any, Annotated
+from typing import Optional, List, Dict, Any, Annotated, Callable, Awaitable, TypeVar
 from functions.interview_questions import *
 from fastapi.responses import JSONResponse
 from app.utils.auth_util import basic_auth
 import random
 import shutil
 import os
+import asyncio
 from app.config import keys
 from datetime import datetime
 import json
 from pathlib import Path 
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.database import get_db
-from app.db.models import Candidate, Interview
+from app.db.models import Candidate, Interview, InterviewFeedback
 from sqlalchemy.future import select
 from sqlalchemy.exc import SQLAlchemyError
 import logging
-
+from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 
 # router = APIRouter(prefix='/AI_Interview')
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 CANDIDATE_INFO = {}
+
+T = TypeVar('T')
+
+async def execute_with_retry(
+    operation: Callable[[AsyncSession], Awaitable[T]], 
+    db_session: AsyncSession, 
+    max_retries: int = 3
+) -> T:
+    """
+    Execute database operation with retry logic for connection issues.
+    
+    Args:
+        operation: A callable that takes db_session as parameter and returns a coroutine
+        db_session: The database session
+        max_retries: Maximum number of retry attempts
+    
+    Returns:
+        Result of the operation
+        
+    Raises:
+        HTTPException: If operation fails after all retries
+    """
+    for attempt in range(max_retries):
+        try:
+            return await operation(db_session)
+        except SQLAlchemyError as db_err:
+            error_msg = str(db_err)
+            logger.error(f"Database error (attempt {attempt + 1}): {error_msg}")
+            
+            # Check if it's a connection-related error
+            if ("connection is closed" in error_msg.lower() or 
+                "interface error" in error_msg.lower() or
+                "connection was closed" in error_msg.lower()):
+                
+                if attempt < max_retries - 1:
+                    logger.info(f"Retrying database operation (attempt {attempt + 2})")
+                    await asyncio.sleep(1)  # Wait before retry
+                    continue
+                else:
+                    raise HTTPException(
+                        status_code=503,
+                        detail="Database connection unavailable. Please try again later."
+                    )
+            else:
+                # Non-connection related database error, don't retry
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Database error: {db_err}"
+                )
+        except Exception as exc:
+            logger.exception(f"Unexpected error (attempt {attempt + 1}): {str(exc)}")
+            if attempt < max_retries - 1:
+                logger.info(f"Retrying due to unexpected error (attempt {attempt + 2})")
+                await asyncio.sleep(1)
+                continue
+            else:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Unexpected error occurred during database operation."
+                )
+    
+    # This should never be reached due to the logic above, but needed for type checking
+    raise HTTPException(
+        status_code=500,
+        detail="Unexpected error: All retry attempts exhausted without proper exception handling."
+    )
 
 async def write_to_json(data, file_name):
 	current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -52,12 +120,11 @@ async def register_candidate(
     candidate_data: CandidateDetails,
     db: AsyncSession = Depends(get_db)
 ):
-    try:
+    async def register_operation(db_session: AsyncSession) -> Candidate:
         candidate_dict = candidate_data.model_dump()
+        logger.info(f"Received candidate registration request for email:{candidate_dict.get('candidate_email')}")
 
-        logger.info("Received candidate registration request for email: %s", candidate_dict.get('candidate_email'))
-
-        candidate  = Candidate(
+        candidate = Candidate(
             name=candidate_dict['candidate_name'],
             email=candidate_dict['candidate_email'],
             role=candidate_dict['role'],
@@ -68,12 +135,16 @@ async def register_candidate(
             experience=candidate_dict.get('experience')
         )
 
-        db.add(candidate)
-        await db.commit()
-        await db.refresh(candidate)
+        db_session.add(candidate)
+        await db_session.commit()
+        await db_session.refresh(candidate)
 
-        logger.info("Candidate registered successfully with ID: %s", candidate.id)
+        logger.info(f"Candidate registered successfully with ID: {candidate.id}")
+        return candidate
 
+    try:
+        candidate = await execute_with_retry(register_operation, db)
+        
         return JSONResponse(
             content={
                 "status": "success",
@@ -91,18 +162,11 @@ async def register_candidate(
                 }
             }
         )
-
-    except SQLAlchemyError as db_err:
-        logger.error("Database error during candidate registration: %s", str(db_err))
-        await db.rollback()
-        raise HTTPException(
-            status_code=500,  #TODO: correct the status code
-            detail="An error occurred while saving candidate data."
-        )
-
+    except HTTPException:
+        # Re-raise HTTP exceptions from execute_with_retry
+        raise
     except Exception as exc:
-        logger.exception("Unexpected error during candidate registration: %s", str(exc))
-        await db.rollback()
+        logger.exception(f"Unexpected error during candidate registration: {str(exc)}")
         raise HTTPException(
             status_code=500,
             detail=f"An unexpected error occurred while processing the registration. {exc}")
@@ -125,10 +189,10 @@ async def upload_audio_response(question: str = Form(...), audio_file: UploadFil
         sanitized_question =  "_".join(question.strip().split()[:5]).replace("/", "_")  # Use first 5 words of the question
         file_name = f"response_{sanitized_question}_{timestamp}.wav"
 
-        with open(audio_dir.joinpath(file_name), "wb") as f:
-            f.write(file_bytes)
+        # with open(audio_dir.joinpath(file_name), "wb") as f:
+        #     f.write(file_bytes)
 
-        logger.info("Audio file saved: %s", file_name)
+        logger.info(f"Audio file saved: {file_name}")
 
         transcript_text = await process_audio_response(question, file_bytes)
 
@@ -139,13 +203,13 @@ async def upload_audio_response(question: str = Form(...), audio_file: UploadFil
                 detail="Failed to transcribe the audio response."
             )
         
-        logger.info("Transcription successful for file: %s", file_name)
+        logger.info(f"Transcription successful for file: {file_name}")
 
-        return {
-            "status": "success",
-            "message": "Audio uploaded and transcribed successfully.",
-            "transcript": transcript_text
-        }
+        return JSONResponse(content={
+        "status": "success",
+        "message": "Audio uploaded and transcribed successfully.",
+        "transcript": transcript_text
+    })
 
     except Exception as err:
         logger.exception(f"Error during audio upload/transcription. Error is {err}")
@@ -157,22 +221,24 @@ async def upload_audio_response(question: str = Form(...), audio_file: UploadFil
 @router.get("/candidate/{email}")
 async def fetch_candidate_by_email(email: str, db: AsyncSession = Depends(get_db)):
 
-    try:
-        logger.info("Fetching candidate details for email: %s", email)
-
-        result = await db.execute(select(Candidate).where(Candidate.email == email))
+    async def fetch_operation(db_session: AsyncSession) -> Candidate:
+        logger.info(f"Fetching candidate details for email: {email}")
+        result = await db_session.execute(select(Candidate).where(Candidate.email == email))
         candidate = result.scalar_one_or_none()
-        logger.info("Fetched candidate details for email: %s", email)
-
+        
         if not candidate:
-            logger.warning("Candidate not found for email: %s", email)
+            logger.warning(f"Candidate not found for email: {email}")
             raise HTTPException(
                 status_code=404,
                 detail="Candidate not found."
             )
+        
+        logger.info(f"Candidate details successfully retrieved for email: {email}")
+        return candidate
 
-        logger.info("Candidate details successfully retrieved for email: %s", email)
-
+    try:
+        candidate = await execute_with_retry(fetch_operation, db)
+        
         return {
             "status": "success",
             "message": "Candidate details fetched successfully.",
@@ -188,74 +254,68 @@ async def fetch_candidate_by_email(email: str, db: AsyncSession = Depends(get_db
                 "experience": candidate.experience
             }
         }
-
-
-    except SQLAlchemyError as db_err:
-        logger.error("Database error while fetching candidate details: %s", str(db_err))
-        raise HTTPException(
-            status_code=500,
-            detail=f"Database error while fetching candidate details. Error is {db_err}"
-        )
+    except HTTPException:
+        # Re-raise HTTP exceptions from execute_with_retry
+        raise
     except Exception as exc:
-        logger.exception("Unexpected error while fetching candidate: %s", str(exc))
+        logger.exception(f"Unexpected error while fetching candidate: {str(exc)}")
         raise HTTPException(
             status_code=500,
             detail="Unexpected error occurred while retrieving candidate information."
         )
 
-# TODO: Implement get all interviews endpoint
-@router.get("/candidates/{email}/interviews")
-async def fetch_candidate_interviews(email: str, db: AsyncSession = Depends(get_db)):
+# # TODO: Implement get all interviews endpoint
+# @router.get("/candidates/{email}/interviews")
+# async def fetch_candidate_interviews(email: str, db: AsyncSession = Depends(get_db)):
 
-    try:
-        logger.info("Fetching interviews for candidate email: %s", email)
-        result = await db.execute(
-            select(Interview).join(Candidate).where(Candidate.email == email)
-        )
-        interviews = result.scalars().all()
+#     async def fetch_interviews_operation(db_session: AsyncSession):
+#         logger.info(f"Fetching interviews for candidate email: {email}")
+#         result = await db_session.execute(
+#             select(Interview).join(Candidate).where(Candidate.email == email)
+#         )
+#         interviews = result.scalars().all()
+#         logger.info(f"Fetched {len(interviews)} interviews for candidate email: {email}")
+#         return interviews
 
-        logger.info("Fetched %d interviews for candidate email: %s", len(interviews), email)
+#     try:
+#         interviews = await execute_with_retry(fetch_interviews_operation, db)
 
-        if not interviews:
-            logger.info("No interviews found for candidate email: %s", email)
-            return JSONResponse(
-                content={
-                    "status": "success",
-                    "message": "No interviews found for this candidate.",
-                    "data": []
-                },
-                status_code=200
-            )
-        logger.info("Found %d interview(s) for candidate: %s", len(interviews), email)
+#         if not interviews:
+#             logger.info(f"No interviews found for candidate email: {email}")
+#             return JSONResponse(
+#                 content={
+#                     "status": "success",
+#                     "message": "No interviews found for this candidate.",
+#                     "data": []
+#                 },
+#                 status_code=200
+#             )
+#         logger.info(f"Found {len(interviews)} interview(s) for candidate: {email}")
 
-        interview_data =  [
-            {
-                "id": iv.id,
-                "date": iv.date,
-                "score": iv.score,
-                "summary": iv.summary
-            } for iv in interviews
-        ]
+#         interview_data =  [
+#             {
+#                 "id": iv.id,
+#                 "date": iv.date,
+#                 "score": iv.score,
+#                 "summary": iv.summary
+#             } for iv in interviews
+#         ]
 
-        return JSONResponse(
-            content={
-                "status": "success",
-                "message": "Interviews fetched successfully.",
-                "data": interview_data
-            })
-    
-    except SQLAlchemyError as db_err:
-        logger.error("Database error while fetching interviews: %s", str(db_err))
-        raise HTTPException(
-            status_code=500,
-            detail=f"Database error while fetching interviews. Error is {db_err}"
-        )
-    except Exception as exc:
-        logger.exception("Unexpected error while fetching interviews: %s", str(exc))
-        raise HTTPException(
-            status_code=500,
-            detail="Unexpected error occurred while retrieving interviews."
-        )
+#         return JSONResponse(
+#             content={
+#                 "status": "success",
+#                 "message": "Interviews fetched successfully.",
+#                 "data": interview_data
+#             })
+#     except HTTPException:
+#         # Re-raise HTTP exceptions from execute_with_retry
+#         raise
+#     except Exception as exc:
+#         logger.exception(f"Unexpected error while fetching interviews: {str(exc)}")
+#         raise HTTPException(
+#             status_code=500,
+#             detail="Unexpected error occurred while retrieving interviews."
+#         )
 
 
 # TODO: Implement update candidate details endpoint 
@@ -263,51 +323,50 @@ async def fetch_candidate_interviews(email: str, db: AsyncSession = Depends(get_
 @router.put("/update_candidate/{email}")
 async def update_candidate(email: str, updated_data: CandidateDetails, db: AsyncSession = Depends(get_db)):
 
-    try:
-        logger.info("Attempting to update candidate with email: %s", email)
+    async def update_operation(db_session: AsyncSession) -> Candidate:
+        logger.info(f"Attempting to update candidate with email: {email}")
 
-        result = await db.execute(select(Candidate).where(Candidate.email == email))
+        result = await db_session.execute(select(Candidate).where(Candidate.email == email))
         candidate = result.scalar_one_or_none()
 
-        logger.info("Fetched candidate details for email: %s", email)
+        logger.info(f"Fetched candidate details for email: {email}")
 
         if not candidate:
-            logger.warning("Candidate not found with email: %s", email)
+            logger.warning(f"Candidate not found with email: {email}")
             raise HTTPException(
                 status_code=404,
                 detail="Candidate not found."
             )
 
-        
         update_fields = updated_data.dict(exclude_unset=True)
         if not update_fields:
-            logger.info("No fields provided to update for candidate: %s", email)
+            logger.info(f"No fields provided to update for candidate: {email}")
             raise HTTPException(
                 status_code=400,
                 detail="No update fields provided."
             )
 
-
         for field, value in updated_data.dict(exclude_unset=True).items():
             setattr(candidate, field, value)
 
-        await db.commit()
-        logger.info("Candidate details updated successfully for email: %s", email)
+        await db_session.commit()
+        logger.info(f"Candidate details updated successfully for email: {email}")
+        return candidate
+
+    try:
+        candidate = await execute_with_retry(update_operation, db)
+        
+        update_fields = updated_data.dict(exclude_unset=True)
         return JSONResponse(
             content={
                 "status": "success",
                 "message": "Candidate details updated successfully.",
-                "data":  list(update_fields.keys())}
+                "data": list(update_fields.keys())
+            }
         )
-    
-
-    
-    except SQLAlchemyError as db_error:
-        logger.warning(f"Error updating candidate details for email {email}: {db_error}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"An error occurred while updating candidate details. Error is {db_error}")
-    
+    except HTTPException:
+        # Re-raise HTTP exceptions from execute_with_retry
+        raise
     except Exception as exc:
         logger.exception(f"Unexpected error while updating candidate: {exc}")
         raise HTTPException(
@@ -318,43 +377,32 @@ async def update_candidate(email: str, updated_data: CandidateDetails, db: Async
 @router.get("/candidates/{email}/interview-questions")
 async def fetch_initial_interview_questions(email: str, db: AsyncSession = Depends(get_db)):
 
-    try:
-        logger.info("Fetching candidate details for email: %s", email)
-        result = await db.execute(select(Candidate).where(Candidate.email == email))
+    async def fetch_candidate_operation(db_session: AsyncSession) -> Candidate:
+        logger.info(f"Fetching candidate details for email: {email}")
+        result = await db_session.execute(select(Candidate).where(Candidate.email == email))
         candidate = result.scalar_one_or_none()
 
         if not candidate:
-            logger.warning("Candidate not found for email: %s", email)
+            logger.warning(f"Candidate not found for email: {email}")
             raise HTTPException(status_code=404, detail="Candidate not found")
 
-        logger.info("Fetched candidate details for email: %s", email)
-        
-        candidate_info = {column.name: getattr(candidate, column.name) for column in candidate.__table__.columns}
-
-        CANDIDATE_INFO.update(candidate_info)
-
-    except SQLAlchemyError as db_err:
-        logger.error("Database error while fetching candidate details: %s", str(db_err))
-        raise HTTPException(
-            status_code=500,
-            detail=f"Database error while fetching candidate details. Error is {db_err}"
-        )
-    except Exception as exc:
-        logger.exception("Unexpected error while fetching candidate: %s", str(exc))
-        raise HTTPException(
-            status_code=500,
-            detail=f"Unexpected error occurred while retrieving candidate information: {exc}"
-        )
+        logger.info(f"Fetched candidate details for email: {email}")
+        return candidate
 
     try:
-        logger.info("Generating initial questions for candidate email: %s", email)
+        candidate = await execute_with_retry(fetch_candidate_operation, db)
+        
+        candidate_info = {column.name: getattr(candidate, column.name) for column in candidate.__table__.columns}
+        CANDIDATE_INFO.update(candidate_info)
+
+        logger.info(f"Generating initial questions for candidate email:{email}")
         initial_question = await generate_initial_questions(candidate_info)
 
         if not initial_question:
-            logger.error("Failed to generate initial questions for candidate email: %s", email)
+            logger.error(f"Failed to generate initial questions for candidate email: {email}")
             raise HTTPException(status_code=500, detail="Failed to generate initial questions.")
         
-        logger.info("Initial questions successfully generated for email: %s", email)
+        logger.info(f"Initial questions successfully generated for email: {email}")
 
         return JSONResponse(
             content={
@@ -363,14 +411,18 @@ async def fetch_initial_interview_questions(email: str, db: AsyncSession = Depen
                 "data": {"question": initial_question}
             }
         )
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
+        logger.exception(f"An error occurred while generating initial questions: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"An error occurred while generating initial questions: {str(e)}"
         )
 
 
-@router.get("/interview/next-question")
+@router.get("/next-question")
 async def fetch_next_interview_question():
     """
     This endpoint is to get the next question based on the last question response and the questions asked so far.
@@ -397,26 +449,58 @@ async def fetch_next_interview_question():
         )
     
     except Exception as e:
-        logger.exception("Error while fetching next question: %s", str(e))
+        logger.exception(f"Error while fetching next question: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"An error occurred while fetching the next question: {str(e)}"
         )
 
 
-@router.get("/candidate/feedback")
-async def fetch_candidate_feedback():
+from sqlalchemy.future import select
+from app.db.models import Candidate, InterviewFeedback
 
+from datetime import datetime
+from app.db.models import Candidate, Interview, InterviewFeedback
+
+@router.get("/candidate/{email}/overall/feedback")
+async def fetch_candidate_feedback(email: str, db: AsyncSession = Depends(get_db)):
     try:
-        logging.info("Fetching feedback for the candidate based on responses and questions asked.")
+        logger.info(f"Fetching feedback for: {email}")
+        
+        # 🎯 1. Generate feedback (from AI logic or wherever)
         feedback_by_question, overall_analysis = await generate_feedback()
 
         if not feedback_by_question or not overall_analysis:
-            logging.warning("No feedback available based on the responses and questions asked.")
             raise HTTPException(status_code=404, detail="No feedback available.")
-        
-        logging.info("Feedback fetched successfully for the candidate.")
-        
+
+        # 🎯 2. Get candidate
+        result = await db.execute(select(Candidate).where(Candidate.email == email))
+        candidate = result.scalars().first()
+        if not candidate:
+            raise HTTPException(status_code=404, detail="Candidate not found.")
+
+        # 🎯 3. Create Interview entry
+        new_interview = Interview(
+            candidate_id=candidate.id,
+            score=overall_analysis.get("score", 0),      # safely fetch score
+            summary=overall_analysis.get("summary", ""),  # safely fetch summary
+            created_at=datetime.utcnow()  # timestamp
+        )
+        db.add(new_interview)
+        await db.flush()  # So new_interview.id is available
+
+        # 🎯 4. Save to InterviewFeedback (linked to new_interview)
+        feedback_record = InterviewFeedback(
+            candidate_id=candidate.id,
+            interview_id=new_interview.id,  # Link it!
+            overall_feedback=overall_analysis,
+            question_feedback=feedback_by_question,
+        )
+        db.add(feedback_record)
+
+        await db.commit()
+
+        logger.info("Feedback fetched and saved.")
 
         return JSONResponse(
             content={
@@ -425,13 +509,25 @@ async def fetch_candidate_feedback():
                 "data": {
                     "overall_feedback": overall_analysis,
                     "feedback_by_question": feedback_by_question
-                    },
+                },
             },
             status_code=200
         )
+
     except Exception as e:
-        logging.exception("Error while fetching feedback: %s", str(e))
-        raise HTTPException(
-            status_code=500,
-            detail=f"An error occurred while fetching feedback: {str(e)}"
-        )
+        logger.exception("Error while saving or fetching feedback")
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@router.get("/{interview_id}/feedback")
+async def get_feedback_by_interview(interview_id: int, db: AsyncSession = Depends(get_db)):
+    interview = await db.get(Interview, interview_id)
+    if not interview:
+        raise HTTPException(status_code=404, detail="Interview not found")
+
+    feedback_data = interview.feedback_data  # assuming you store it as JSON
+
+    return {
+        "status": "success",
+        "data": feedback_data
+    }
+
