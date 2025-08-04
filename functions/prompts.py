@@ -341,6 +341,7 @@ Score it overall in the range of 0-10 based on everthing and provide the reasoni
 
 List all the Technical Skills and Soft Skills that the candidate has based on the questions asked and the responses given by the candidate on the skills that the questions are based on. and rate candidate on the scale of 0-10 for each skill based on the responses given by the candidate on the skills that the questions are based on.  
 
+
 """
 }
 
