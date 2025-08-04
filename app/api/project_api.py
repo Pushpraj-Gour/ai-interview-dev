@@ -374,6 +374,16 @@ async def update_candidate(email: str, updated_data: CandidateDetails, db: Async
             detail=f"An error occurred while updating candidate details. The error is {exc}"
         )
 
+# @router.get("/candidates/{email}/interview-questions")
+# async def fetch_initial_interview_questions(email: str, db: AsyncSession = Depends(get_db)):
+#     return JSONResponse(
+#         content={
+#             "status": "success",
+#             "message": "Initial questions generated successfully.",
+#             "data": {"question": "Can you explain the difference between a list and a tuple in Python?"}
+#         }
+#     )
+    
 @router.get("/candidates/{email}/interview-questions")
 async def fetch_initial_interview_questions(email: str, db: AsyncSession = Depends(get_db)):
 

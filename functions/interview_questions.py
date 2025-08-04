@@ -285,6 +285,7 @@ class DetailedAnalysisResponse(BaseModel):
 
 class DedicatedAnalysis(BaseModel):
     question: str
+    response: str
     overall_score: int
     overall_reasoning: str
     question_and_response_detailed_analysis: List[DetailedAnalysisResponse]
