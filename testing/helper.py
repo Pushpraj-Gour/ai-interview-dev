@@ -181,15 +181,13 @@ Clicking Start Interview redirects to the InterviewSimulator page to begin the r
 
 The audio file is:
 
-Sent to the backend via an API along with corresponding question.
-A separate API call fetches the next interview question.
+The audio file is sent to the backend via an API along with corresponding question.
+A separate API call fetches the next interview question after we get a success status of the audio file .
 This process continues until all questions are asked and answered.
 
 C. Interview Termination
     The user can end the interview at any time using an “End Interview” button.
-
-    If the user refreshes the page, the interview will end immediately (no session restoration or auto-resume).
-
+    
 3. Post-Interview Evaluation
     Once the interview is complete:
 
@@ -266,3 +264,4 @@ Based on this input, the language model should:
 5. Provide an ideal or model answer to the same question for comparison.
 The evaluation criteria and analytical approach should be internally decided by the model based on the context and role provided. The tone should mimic that of a real interview assessment.
 """
+

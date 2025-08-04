@@ -379,6 +379,7 @@ Write a clear and concise summary of the candidate's interview performance cover
 - **Strength areas** - where the candidate performed well across questions (e.g., communication, ML understanding, tooling knowledge, etc.).
 - **Improvement areas** - where the candidate consistently underperformed or showed gaps.
 - **Actionable suggestions** - how the candidate can improve in their weak areas (e.g., studying SQL basics, practicing delivery, deepening domain knowledge).
+- **Keep the summary focused on the overall performance, not individual question details under 50 words**
 
 #### 2. **Overall Scores (0-10)**
 

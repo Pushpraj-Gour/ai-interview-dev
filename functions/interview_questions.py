@@ -388,6 +388,17 @@ async def process_and_give_overall_feedback(per_question_analysis):
             )
         
         await write_to_json(output, "final_result.json")
+
+        # Clear the session data after processing overall feedback
+        global CANDIDATE_INFO, MAJOR_QUESTIONS, QUESTION_ASKED, QUESTION_ANSWERED, LAST_QUESTION_ASKED, LAST_QUESTION_ASKED_IS_FOLLOW_UP
+
+        CANDIDATE_INFO = {}
+        MAJOR_QUESTIONS = []
+        QUESTION_ASKED = []
+        LAST_QUESTION_ASKED = ""
+        QUESTION_ANSWERED = {}
+        LAST_QUESTION_ASKED_IS_FOLLOW_UP = False
+
         
         logger.info("Overall feedback processed successfully.")
         return output

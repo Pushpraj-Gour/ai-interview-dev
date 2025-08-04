@@ -482,8 +482,8 @@ async def fetch_candidate_feedback(email: str, db: AsyncSession = Depends(get_db
         # 🎯 3. Create Interview entry
         new_interview = Interview(
             candidate_id=candidate.id,
-            score=overall_analysis.get("score", 0),      # safely fetch score
-            summary=overall_analysis.get("summary", ""),  # safely fetch summary
+            score=overall_analysis.get("overall_score", 0),      # safely fetch score
+            summary=overall_analysis.get("overall_reasoning", ""),  # safely fetch summary
             created_at=datetime.utcnow()  # timestamp
         )
         db.add(new_interview)
@@ -520,14 +520,70 @@ async def fetch_candidate_feedback(email: str, db: AsyncSession = Depends(get_db
     
 @router.get("/{interview_id}/feedback")
 async def get_feedback_by_interview(interview_id: int, db: AsyncSession = Depends(get_db)):
-    interview = await db.get(Interview, interview_id)
+    # Query interview with eagerly loaded feedback_data relationship
+    result = await db.execute(
+        select(Interview)
+        .options(selectinload(Interview.feedback_data))
+        .where(Interview.id == interview_id)
+    )
+    interview = result.scalar_one_or_none()
+    
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
 
-    feedback_data = interview.feedback_data  # assuming you store it as JSON
-
+    # Now safely access the feedback_data relationship
+    feedback_records = interview.feedback_data
+    
+    if not feedback_records:
+        return {
+            "status": "success",
+            "data": None,
+            "message": "No feedback available for this interview"
+        }
+    
+    # Return the feedback data from the first (or most recent) feedback record
+    feedback_record = feedback_records[0] if len(feedback_records) == 1 else feedback_records[-1]
+    
     return {
         "status": "success",
-        "data": feedback_data
+        "data": {
+            "overall_feedback": feedback_record.overall_feedback,
+            "question_feedback": feedback_record.question_feedback,
+            "timestamp": feedback_record.timestamp.isoformat() if feedback_record.timestamp else None
+        }
     }
+
+@router.get("/candidate/{email}/interviews")
+async def get_all_interviews(email: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(Candidate)
+        .options(selectinload(Candidate.interviews))
+        .where(Candidate.email == email)
+    )
+    candidate = result.scalars().first()
+
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+
+    if not candidate.interviews:
+        return JSONResponse(
+            content={"status": "success", "interviews": []},
+            status_code=200
+        )
+
+    interviews_data = [
+        {
+            "id": interview.id,
+            "score": interview.score,
+            "summary": interview.summary,
+            "created_at": interview.created_at.isoformat(),
+        }
+        for interview in candidate.interviews
+    ]
+
+    return JSONResponse(
+        content={"status": "success", "interviews": interviews_data},
+        status_code=200
+    )
+
 
