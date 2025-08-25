@@ -34,14 +34,14 @@ Instructions for Generating Questions:
 generate_basic_user_message_2 = {
     "user_message": """
 You are acting as a highly experienced technical interviewer.  
-Your task is to generate a list of **interview questions tailored specifically to the candidate’s resume**.  
+Your task is to generate a list of **interview questions tailored specifically to the candidate's resume**.  
 
 Candidate Profile:
 1. Candidate Name: {candidate_name}
 2. Job Role: {role}
-3. Candidate Skills: {Skills}
-4. Candidate Experience: {Experience},
-5. Candidate Projects: {Projects}
+3. Candidate Skills: {skills}
+4. Candidate Experience: {experience}
+5. Candidate Projects: {projects}
 
 Guidelines for Question Generation:
 1. Questions must be **directly inspired by the candidate's profile**. Reference their listed experiences, projects, technologies, and skills.
@@ -56,7 +56,7 @@ Guidelines for Question Generation:
 7. Keep the questions concise, but challenging.  
 
 Output:
-- A numbered list of **10–15 interview questions**, ordered from easier to more difficult.
+- A numbered list of **10-15 interview questions**, ordered from easier to more difficult.
 """}
 
 
@@ -206,6 +206,67 @@ Candidate's Response: {response}
    - Make it specific to what the candidate mentioned.
    - Keep it conversational, like a real interviewer would ask.
 
+
+"""}
+
+generate_question_based_on_response_4 = {
+    "user_message": """
+You are acting as a realistic and professional interviewer in a mock interview setting.  
+Your goals are to:  
+- Keep the interview natural, engaging, and candidate-focused.  
+- Cover as many of the candidate's listed skills as possible across the session.  
+- Use thoughtful, context-aware follow-ups when the candidate's response invites deeper exploration.  
+
+### Candidate Name:
+{candidate_name}
+
+### Job Role:
+{role}
+
+### Candidate Skills:
+{skills}
+
+### Candidate Projects:
+{projects}
+
+### Candidate Experience:
+{experience}
+
+### List of Major Questions:
+{major_questions}
+
+### Questions Already Asked:
+{questions_asked}
+
+### Most Recent Question and Candidate's Response:
+Q: {last_question}  
+A: {response}  
+
+### Instructions:
+1. First, decide if a follow-up question is appropriate.  
+   - Ask a follow-up if:  
+     • The answer is **brief, vague, or under 50 words**.  
+     • The answer references a **key skill, project, or tool** that deserves more exploration.  
+     • The answer suggests **decision-making, trade-offs, debugging, leadership, or design choices** that weren't explained.  
+     • The answer touches on something **unique or impressive** from the candidate's background.  
+   - Skip the follow-up if:  
+     • The answer is already **detailed and well-reasoned**, covering context, challenges, and outcomes.  
+     • The topic is **minor compared to other uncovered skills**.  
+
+2. If a follow-up is needed:  
+   - Generate **ONE natural, conversational question**.  
+   - The follow-up must:  
+     • Be directly tied to the candidate's last response.  
+     • Go **deeper** into reasoning, problem-solving, design choices, or lessons learned.  
+     • Avoid repeating the major question.  
+     • Vary in tone and phrasing so it doesn't sound formulaic across different runs.  
+
+3. Keep it realistic:  
+   - Use phrasing like a human interviewer (e.g., “That's interesting, could you walk me through…” or “How did you decide on…”).  
+   - Ensure the flow feels like a real dialogue, not a script.  
+
+Output:  
+- Either a **single follow-up question** OR a clear decision: *“No follow-up needed, move to next major question.”*  
 
 """}
 

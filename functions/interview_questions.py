@@ -54,6 +54,8 @@ async def generate_initial_questions(candidate_info: Dict):
             "role": candidate_info.get("role"),
             "skills": candidate_info.get("skills"),
             "education": candidate_info.get("education"),
+            "projects": candidate_info.get("projects"),
+            "experience": candidate_info.get("experience")
         }
     
     except Exception as e:
@@ -63,7 +65,7 @@ async def generate_initial_questions(candidate_info: Dict):
     logger.info(f"Candidate info validated and stored.")
     
     try:
-        user_message = prompts.generate_basic_user_message["user_message"].format(**data)
+        user_message = prompts.generate_basic_user_message_2["user_message"].format(**data)
         output = await llm_util.llm_genai_2(prompt=user_message, response_schema=Questions)
         logger.info(f"Successfully received questions from LLM.")
 
@@ -159,7 +161,7 @@ class QuestionSuggestion(BaseModel):
     reraise=True
 )
 async def fetch_next_question_from_llm(data):
-    user_message_template = prompts.generate_question_based_on_response_3["user_message"]
+    user_message_template = prompts.generate_question_based_on_response_4["user_message"]
     user_message = user_message_template.format(**data)
     return await llm_util.llm_genai_2(user_message, response_schema=QuestionSuggestion)
 
@@ -197,6 +199,8 @@ async def next_question():
             "candidate_name": candidate_info.get("name"),
             "role": candidate_info.get("role"),
             "skills": candidate_info.get("skills"),
+            "experience": candidate_info.get("experience"),
+            "projects": candidate_info.get("projects"),
             "major_questions": MAJOR_QUESTIONS,
             "questions_asked": QUESTION_ASKED,
             "last_question": LAST_QUESTION_ASKED,
