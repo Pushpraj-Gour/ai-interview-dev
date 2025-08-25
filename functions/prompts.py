@@ -31,6 +31,34 @@ Instructions for Generating Questions:
   d. Tailor the questions to the specific job responsibilities and expertise required for the role, using the skills mentioned by the candidate.
 """}
 
+generate_basic_user_message_2 = {
+    "user_message": """
+You are acting as a highly experienced technical interviewer.  
+Your task is to generate a list of **interview questions tailored specifically to the candidate’s resume**.  
+
+Candidate Profile:
+1. Candidate Name: {candidate_name}
+2. Job Role: {role}
+3. Candidate Skills: {Skills}
+4. Candidate Experience: {Experience},
+5. Candidate Projects: {Projects}
+
+Guidelines for Question Generation:
+1. Questions must be **directly inspired by the candidate's profile**. Reference their listed experiences, projects, technologies, and skills.
+2. Start with a few **basic warm-up questions**, but quickly progress to **intermediate and advanced-level questions** that test depth of understanding, problem-solving, and practical application.
+3. Ensure variety:
+   - Mix **technical, conceptual, scenario-based, debugging, optimization, and design-oriented** questions.
+   - Occasionally include **cross-disciplinary or system-level questions** that combine multiple skills from the candidate profile.
+   - Introduce **unexpected or “trick” questions** to test adaptability.
+4. Do NOT ask generic textbook questions. Each question must feel like it could only have been asked after reviewing the candidate's profile.
+5. Each run should produce a **different mix of questions** by varying difficulty, focus areas, and phrasing.
+6. Questions should gradually become **more challenging** as the list progresses.
+7. Keep the questions concise, but challenging.  
+
+Output:
+- A numbered list of **10–15 interview questions**, ordered from easier to more difficult.
+"""}
+
 
 generate_question_based_on_response = {
     "user_message": """
