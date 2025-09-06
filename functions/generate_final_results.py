@@ -18,7 +18,4 @@ async def create_interview(session: AsyncSession, candidate_id: int, score: floa
 
 if __name__ == "__main__":
     print("hello")
-#     from db.crud import create_interview
 
-# # Inside some API or handler
-#     await create_interview(session=db, candidate_id=1, score=92.0, summary="Excellent in data structures.")

@@ -9,9 +9,7 @@ logger = logging.getLogger(__name__)
 
 DATABASE_URL = keys.neon_db_connection_DATABASE_URL
 
-# Create async engine with connection pooling and retry configuration
 if keys.is_local():
-    # For local development, use NullPool (no connection pooling)
     engine = create_async_engine(
         DATABASE_URL, 
         echo=True,
@@ -19,7 +17,7 @@ if keys.is_local():
         poolclass=NullPool
     )
 else:
-    # For production, use proper connection pooling
+
     engine = create_async_engine(
         DATABASE_URL, 
         echo=True,
@@ -30,13 +28,10 @@ else:
         pool_size=5,         # Base number of connections to maintain
     )
 
-# Create async sessionmaker
 SessionLocal = async_sessionmaker(bind=engine, expire_on_commit=False)
 
-# Declare Base for models to inherit
 Base = declarative_base()
 
-# Dependency to get DB session per request with retry logic
 async def get_db():
     retries = 3
     for attempt in range(retries):

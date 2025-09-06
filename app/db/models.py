@@ -19,10 +19,8 @@ class Candidate(Base):
     achievements = Column(String)
     experience = Column(String)
 
-    # ✅ Relationship to Interview
     interviews = relationship("Interview", back_populates="candidate", cascade="all, delete-orphan")
 
-    # ✅ Optional: access all feedbacks through candidate
     interview_feedbacks = relationship("InterviewFeedback", back_populates="candidate")
 
 
@@ -35,7 +33,6 @@ class Interview(Base):
     summary = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    # ✅ Relationships
     candidate = relationship("Candidate", back_populates="interviews")
     feedback_data = relationship("InterviewFeedback", back_populates="interview")
 
@@ -47,7 +44,7 @@ class InterviewFeedback(Base):
     id = Column(Integer, primary_key=True, index=True)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
 
-    interview_id = Column(Integer, ForeignKey("interviews.id"))  # ✅ This must exist!
+    interview_id = Column(Integer, ForeignKey("interviews.id"))
     candidate_id = Column(Integer, ForeignKey("candidates.id"), nullable=False)
 
     overall_feedback = Column(JSON, nullable=False)

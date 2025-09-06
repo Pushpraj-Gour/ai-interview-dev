@@ -34,20 +34,7 @@ async def execute_with_retry(
     db_session: AsyncSession, 
     max_retries: int = 3
 ) -> T:
-    """
-    Execute database operation with retry logic for connection issues.
     
-    Args:
-        operation: A callable that takes db_session as parameter and returns a coroutine
-        db_session: The database session
-        max_retries: Maximum number of retry attempts
-    
-    Returns:
-        Result of the operation
-        
-    Raises:
-        HTTPException: If operation fails after all retries
-    """
     for attempt in range(max_retries):
         try:
             return await operation(db_session)
@@ -120,7 +107,7 @@ async def register_candidate(
     candidate_data: CandidateDetails,
     db: AsyncSession = Depends(get_db)
 ):
-    async def register_operation(db_session: AsyncSession) -> Candidate:
+    async def register_operation(db_session: AsyncSession):
         candidate_dict = candidate_data.model_dump()
         logger.info(f"Received candidate registration request for email:{candidate_dict.get('candidate_email')}")
 
@@ -162,9 +149,6 @@ async def register_candidate(
                 }
             }
         )
-    except HTTPException:
-        # Re-raise HTTP exceptions from execute_with_retry
-        raise
     except Exception as exc:
         logger.exception(f"Unexpected error during candidate registration: {str(exc)}")
         raise HTTPException(
@@ -180,19 +164,18 @@ async def upload_audio_response(question: str = Form(...), audio_file: UploadFil
             logger.warning("Empty audio file uploaded.")
             raise HTTPException(status_code=400, detail="Uploaded audio file is empty.")
         
-
-        audio_dir = Path(keys.directory).joinpath("responses_audio")  # .wav lossless format
-        os.makedirs(audio_dir, exist_ok=True)
+        # audio_dir = Path(keys.directory).joinpath("responses_audio")  # .wav lossless format
+        # os.makedirs(audio_dir, exist_ok=True)
 
         # Generate a clear and concise file name
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        sanitized_question =  "_".join(question.strip().split()[:5]).replace("/", "_")  # Use first 5 words of the question
-        file_name = f"response_{sanitized_question}_{timestamp}.wav"
+        # timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        # sanitized_question =  "_".join(question.strip().split()[:5]).replace("/", "_")  # Use first 5 words of the question
+        # file_name = f"response_{sanitized_question}_{timestamp}.wav"
 
         # with open(audio_dir.joinpath(file_name), "wb") as f:
         #     f.write(file_bytes)
 
-        logger.info(f"Audio file saved: {file_name}")
+        # logger.info(f"Audio file saved: {file_name}")
 
         transcript_text = await process_audio_response(question, file_bytes)
 
@@ -203,7 +186,7 @@ async def upload_audio_response(question: str = Form(...), audio_file: UploadFil
                 detail="Failed to transcribe the audio response."
             )
         
-        logger.info(f"Transcription successful for file: {file_name}")
+        # logger.info(f"Transcription successful for file: {file_name}")
 
         return JSONResponse(content={
         "status": "success",
@@ -254,9 +237,6 @@ async def fetch_candidate_by_email(email: str, db: AsyncSession = Depends(get_db
                 "experience": candidate.experience
             }
         }
-    except HTTPException:
-        # Re-raise HTTP exceptions from execute_with_retry
-        raise
     except Exception as exc:
         logger.exception(f"Unexpected error while fetching candidate: {str(exc)}")
         raise HTTPException(
@@ -268,111 +248,63 @@ async def fetch_candidate_by_email(email: str, db: AsyncSession = Depends(get_db
 # @router.get("/candidates/{email}/interviews")
 # async def fetch_candidate_interviews(email: str, db: AsyncSession = Depends(get_db)):
 
-#     async def fetch_interviews_operation(db_session: AsyncSession):
-#         logger.info(f"Fetching interviews for candidate email: {email}")
-#         result = await db_session.execute(
-#             select(Interview).join(Candidate).where(Candidate.email == email)
-#         )
-#         interviews = result.scalars().all()
-#         logger.info(f"Fetched {len(interviews)} interviews for candidate email: {email}")
-#         return interviews
-
-#     try:
-#         interviews = await execute_with_retry(fetch_interviews_operation, db)
-
-#         if not interviews:
-#             logger.info(f"No interviews found for candidate email: {email}")
-#             return JSONResponse(
-#                 content={
-#                     "status": "success",
-#                     "message": "No interviews found for this candidate.",
-#                     "data": []
-#                 },
-#                 status_code=200
-#             )
-#         logger.info(f"Found {len(interviews)} interview(s) for candidate: {email}")
-
-#         interview_data =  [
-#             {
-#                 "id": iv.id,
-#                 "date": iv.date,
-#                 "score": iv.score,
-#                 "summary": iv.summary
-#             } for iv in interviews
-#         ]
-
-#         return JSONResponse(
-#             content={
-#                 "status": "success",
-#                 "message": "Interviews fetched successfully.",
-#                 "data": interview_data
-#             })
-#     except HTTPException:
-#         # Re-raise HTTP exceptions from execute_with_retry
-#         raise
-#     except Exception as exc:
-#         logger.exception(f"Unexpected error while fetching interviews: {str(exc)}")
-#         raise HTTPException(
-#             status_code=500,
-#             detail="Unexpected error occurred while retrieving interviews."
-#         )
 
 
 # TODO: Implement update candidate details endpoint 
 # TODO: Baisc idea is to have the existing candidate details fetched from the database, and then update the fields which are not None in the request body.
-@router.put("/update_candidate/{email}")
-async def update_candidate(email: str, updated_data: CandidateDetails, db: AsyncSession = Depends(get_db)):
+# @router.put("/update_candidate/{email}")
+# async def update_candidate(email: str, updated_data: CandidateDetails, db: AsyncSession = Depends(get_db)):
 
-    async def update_operation(db_session: AsyncSession) -> Candidate:
-        logger.info(f"Attempting to update candidate with email: {email}")
+#     async def update_operation(db_session: AsyncSession):
+#         logger.info(f"Attempting to update candidate with email: {email}")
 
-        result = await db_session.execute(select(Candidate).where(Candidate.email == email))
-        candidate = result.scalar_one_or_none()
+#         result = await db_session.execute(select(Candidate).where(Candidate.email == email))
+#         candidate = result.scalar_one_or_none()
 
-        logger.info(f"Fetched candidate details for email: {email}")
+#         logger.info(f"Fetched candidate details for email: {email}")
 
-        if not candidate:
-            logger.warning(f"Candidate not found with email: {email}")
-            raise HTTPException(
-                status_code=404,
-                detail="Candidate not found."
-            )
+#         if not candidate:
+#             logger.warning(f"Candidate not found with email: {email}")
+#             raise HTTPException(
+#                 status_code=404,
+#                 detail="Candidate not found."
+#             )
 
-        update_fields = updated_data.dict(exclude_unset=True)
-        if not update_fields:
-            logger.info(f"No fields provided to update for candidate: {email}")
-            raise HTTPException(
-                status_code=400,
-                detail="No update fields provided."
-            )
+#         update_fields = updated_data.dict(exclude_unset=True)
+#         if not update_fields:
+#             logger.info(f"No fields provided to update for candidate: {email}")
+#             raise HTTPException(
+#                 status_code=400,
+#                 detail="No update fields provided."
+#             )
 
-        for field, value in updated_data.dict(exclude_unset=True).items():
-            setattr(candidate, field, value)
+#         for field, value in updated_data.dict(exclude_unset=True).items():
+#             setattr(candidate, field, value)
 
-        await db_session.commit()
-        logger.info(f"Candidate details updated successfully for email: {email}")
-        return candidate
+#         await db_session.commit()
+#         logger.info(f"Candidate details updated successfully for email: {email}")
+#         return candidate
 
-    try:
-        candidate = await execute_with_retry(update_operation, db)
+#     try:
+#         candidate = await execute_with_retry(update_operation, db)
         
-        update_fields = updated_data.dict(exclude_unset=True)
-        return JSONResponse(
-            content={
-                "status": "success",
-                "message": "Candidate details updated successfully.",
-                "data": list(update_fields.keys())
-            }
-        )
-    except HTTPException:
-        # Re-raise HTTP exceptions from execute_with_retry
-        raise
-    except Exception as exc:
-        logger.exception(f"Unexpected error while updating candidate: {exc}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"An error occurred while updating candidate details. The error is {exc}"
-        )
+#         update_fields = updated_data.dict(exclude_unset=True)
+#         return JSONResponse(
+#             content={
+#                 "status": "success",
+#                 "message": "Candidate details updated successfully.",
+#                 "data": list(update_fields.keys())
+#             }
+#         )
+#     except HTTPException:
+#         # Re-raise HTTP exceptions from execute_with_retry
+#         raise
+#     except Exception as exc:
+#         logger.exception(f"Unexpected error while updating candidate: {exc}")
+#         raise HTTPException(
+#             status_code=500,
+#             detail=f"An error occurred while updating candidate details. The error is {exc}"
+#         )
 
 # @router.get("/candidates/{email}/interview-questions")
 # async def fetch_initial_interview_questions(email: str, db: AsyncSession = Depends(get_db)):
@@ -387,7 +319,7 @@ async def update_candidate(email: str, updated_data: CandidateDetails, db: Async
 @router.get("/candidates/{email}/interview-questions")
 async def fetch_initial_interview_questions(email: str, db: AsyncSession = Depends(get_db)):
 
-    async def fetch_candidate_operation(db_session: AsyncSession) -> Candidate:
+    async def fetch_candidate_operation(db_session: AsyncSession):
         logger.info(f"Fetching candidate details for email: {email}")
         result = await db_session.execute(select(Candidate).where(Candidate.email == email))
         candidate = result.scalar_one_or_none()
@@ -401,7 +333,7 @@ async def fetch_initial_interview_questions(email: str, db: AsyncSession = Depen
 
     try:
         candidate = await execute_with_retry(fetch_candidate_operation, db)
-        
+
         candidate_info = {column.name: getattr(candidate, column.name) for column in candidate.__table__.columns}
         CANDIDATE_INFO.update(candidate_info)
 
@@ -421,9 +353,6 @@ async def fetch_initial_interview_questions(email: str, db: AsyncSession = Depen
                 "data": {"question": initial_question}
             }
         )
-    except HTTPException:
-        # Re-raise HTTP exceptions
-        raise
     except Exception as e:
         logger.exception(f"An error occurred while generating initial questions: {str(e)}")
         raise HTTPException(
@@ -431,13 +360,8 @@ async def fetch_initial_interview_questions(email: str, db: AsyncSession = Depen
             detail=f"An error occurred while generating initial questions: {str(e)}"
         )
 
-
 @router.get("/next-question")
 async def fetch_next_interview_question():
-    """
-    This endpoint is to get the next question based on the last question response and the questions asked so far.
-    """
-
     try:
         logger.info("Fetching next question based on last response and asked questions.")
         
@@ -465,44 +389,33 @@ async def fetch_next_interview_question():
             detail=f"An error occurred while fetching the next question: {str(e)}"
         )
 
-
-from sqlalchemy.future import select
-from app.db.models import Candidate, InterviewFeedback
-
-from datetime import datetime
-from app.db.models import Candidate, Interview, InterviewFeedback
-
 @router.get("/candidate/{email}/overall/feedback")
 async def fetch_candidate_feedback(email: str, db: AsyncSession = Depends(get_db)):
     try:
         logger.info(f"Fetching feedback for: {email}")
         
-        # 🎯 1. Generate feedback (from AI logic or wherever)
         feedback_by_question, overall_analysis = await generate_feedback()
 
         if not feedback_by_question or not overall_analysis:
             raise HTTPException(status_code=404, detail="No feedback available.")
 
-        # 🎯 2. Get candidate
         result = await db.execute(select(Candidate).where(Candidate.email == email))
         candidate = result.scalars().first()
         if not candidate:
             raise HTTPException(status_code=404, detail="Candidate not found.")
 
-        # 🎯 3. Create Interview entry
         new_interview = Interview(
             candidate_id=candidate.id,
-            score=overall_analysis.get("overall_score", 0),      # safely fetch score
-            summary=overall_analysis.get("overall_reasoning", ""),  # safely fetch summary
-            created_at=datetime.utcnow()  # timestamp
+            score=overall_analysis.get("overall_score", 0),   
+            summary=overall_analysis.get("overall_reasoning", ""),
+            created_at=datetime.utcnow() 
         )
         db.add(new_interview)
-        await db.flush()  # So new_interview.id is available
+        await db.flush() 
 
-        # 🎯 4. Save to InterviewFeedback (linked to new_interview)
         feedback_record = InterviewFeedback(
             candidate_id=candidate.id,
-            interview_id=new_interview.id,  # Link it!
+            interview_id=new_interview.id, 
             overall_feedback=overall_analysis,
             question_feedback=feedback_by_question,
         )
@@ -530,7 +443,6 @@ async def fetch_candidate_feedback(email: str, db: AsyncSession = Depends(get_db
     
 @router.get("/{interview_id}/feedback")
 async def get_feedback_by_interview(interview_id: int, db: AsyncSession = Depends(get_db)):
-    # Query interview with eagerly loaded feedback_data relationship
     result = await db.execute(
         select(Interview)
         .options(selectinload(Interview.feedback_data))
@@ -541,7 +453,6 @@ async def get_feedback_by_interview(interview_id: int, db: AsyncSession = Depend
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
 
-    # Now safely access the feedback_data relationship
     feedback_records = interview.feedback_data
     
     if not feedback_records:
@@ -551,7 +462,6 @@ async def get_feedback_by_interview(interview_id: int, db: AsyncSession = Depend
             "message": "No feedback available for this interview"
         }
     
-    # Return the feedback data from the first (or most recent) feedback record
     feedback_record = feedback_records[0] if len(feedback_records) == 1 else feedback_records[-1]
     
     return {
