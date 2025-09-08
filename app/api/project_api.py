@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Annotated, Callable, Awaitable, TypeVar
 from functions.interview_questions import *
 from fastapi.responses import JSONResponse
-from app.utils.auth_util import basic_auth
+# from app.utils.auth_util import basic_auth
 import random
 import shutil
 import os

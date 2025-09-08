@@ -1,6 +1,4 @@
 import asyncio
-from contextlib import asynccontextmanager
-
 import uvicorn
 from fastapi import (APIRouter, Depends, FastAPI, HTTPException, Query, Request,
                      status)
@@ -15,16 +13,10 @@ import logging
 logging.basicConfig(format='%(asctime)s: [%(funcName)s]: %(message)s', level=logging.INFO, force=True)
 
 from app.config import keys
+from contextlib import asynccontextmanager
 
-app_name = ''
-routers = []
-if keys.routers == 'just_testing':
-    routers = [project_api.router]
-    app_name = 'Interview APIs'
-
-else:
-    routers = [project_api.router]
-    app_name = 'Mock Interview Simulator - All APIs'
+routers = [project_api.router]
+app_name = 'Mock Interview Simulator - All APIs'
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
